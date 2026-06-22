@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Code Workshop Pro</title>
+    <style>
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            max-width: 800px; 
+            margin: 2rem auto; 
+            padding: 1rem; 
+            background: #121212; 
+            color: #e0e0e0; 
+        }
+        h2 { text-align: center; color: #fff; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #a3a3a3; font-size: 14px; margin-bottom: 20px; }
+        
+        /* --- Settings / System Prompt --- */
+        .settings-panel {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            margin-bottom: 15px;
+        }
+        .settings-panel label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        textarea#system-prompt {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            background: #000;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            resize: vertical;
+            min-height: 60px;
+            font-family: monospace;
+        }
+
+        /* --- Chat Box --- */
+        #chat-box { 
+            height: 500px; 
+            border: 1px solid #333; 
+            padding: 1.5rem; 
+            overflow-y: auto; 
+            margin-bottom: 1rem; 
+            background: #1a1a1a; 
+            border-radius: 8px; 
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .message { 
+            padding: 12px 16px; 
+            border-radius: 8px; 
+            max-width: 85%;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        .user { 
+            background: #2563eb; 
+            align-self: flex-end; 
+            color: #fff;
+            border-bottom-right-radius: 2px;
+        }
+        .bot { 
+            background: #262626; 
+            align-self: flex-start; 
+            border-bottom-left-radius: 2px;
+            border: 1px solid #333;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* --- Code Workshop Box Styles --- */
+        .code-workshop { 
+            margin: 15px 0; 
+            border-radius: 6px; 
+            overflow: hidden; 
+            background: #000; 
+            border: 1px solid #444; 
+        }
+        .ws-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: #1f1f1f; 
+            padding: 8px 12px; 
+            border-bottom: 1px solid #444; 
+        }
+        .ws-lang { 
+            color: #a3a3a3; 
+            font-size: 12px; 
+            text-transform: uppercase; 
+            font-weight: bold; 
+            letter-spacing: 0.5px;
+        }
+        .ws-actions { 
+            display: flex; 
+            gap: 8px; 
+        }
+        .ws-btn { 
+            background: #333; 
+            color: #e0e0e0; 
+            border: 1px solid #555; 
+            padding: 5px 12px; 
+            border-radius: 4px; 
+            font-size: 12px; 
+            cursor: pointer; 
+            transition: all 0.2s ease;
+        }
+        .ws-btn:hover { background: #555; color: #fff; }
+        pre { 
+            margin: 0; 
+            padding: 15px; 
+            overflow-x: auto; 
+            font-size: 14px; 
+            color: #9cdcfe; 
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .text-content { margin-bottom: 10px; }
+
+        /* --- Input Area --- */
+        .input-area { display: flex; gap: 10px; }
+        input { 
+            flex-grow: 1; 
+            padding: 15px; 
+            border: 1px solid #333; 
+            border-radius: 8px; 
+            background: #1a1a1a; 
+            color: white; 
+            font-size: 16px;
+        }
+        input:focus { outline: none; border-color: #2563eb; }
+        button.send-btn { 
+            padding: 15px 25px; 
+            background: #2563eb; 
+            color: white; 
+            font-weight: bold;
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+        }
+        button.send-btn:hover { background: #1d4ed8; }
+    </style>
+</head>
+<body>
+
+    <h2>AI Code Workshop Pro</h2>
+    <div class="subtitle">With Memory & Master Instructions</div>
+
+    <div class="settings-panel">
+        <label for="system-prompt">🧠 Master AI Instructions (Make it smart here):</label>
+        <textarea id="system-prompt" placeholder="Tell the AI how to act...">You are an expert coder. ALWAYS wrap your code blocks in Markdown (like ```html and ```) so the Workshop UI can detect them. Never output raw code as plain text.</textarea>
+    </div>
+
+    <div id="chat-box">
+        <div class="message bot">
+            <div class="text-content">Hello! I now have a memory and will follow your Master Instructions above. What are we building today?</div>
+        </div>
+    </div>
+    
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="Type your prompt here..." onkeypress="handleKeyPress(event)">
+        <button class="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        const API_KEY = "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";
+        const ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+        const MODEL = "openai/gpt-oss-120b";
+
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const systemPromptInput = document.getElementById('system-prompt');
+
+        // This array acts as the AI's "Memory"
+        let chatHistory = [];
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') sendMessage();
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            addMessage(text, 'user');
+            userInput.value = '';
+
+            const loadingId = addMessage("Thinking...", 'bot');
+
+            // 1. Get the Master Instructions
+            const systemText = systemPromptInput.value.trim();
+            
+            // 2. Build the message payload (System + History + New Message)
+            let apiMessages = [];
+            if (systemText) {
+                apiMessages.push({ role: 'system', content: systemText });
+            }
+            apiMessages = apiMessages.concat(chatHistory);
+            apiMessages.push({ role: 'user', content: text });
+
+            try {
+                const response = await fetch(ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: MODEL,
+                        messages: apiMessages
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById(loadingId).remove();
+
+                if (data.choices && data.choices.length > 0) {
+                    const botReply = data.choices[0].message.content;
+                    addMessage(botReply, 'bot');
+                    
+                    // Save to memory so it gets smarter
+                    chatHistory.push({ role: 'user', content: text });
+                    chatHistory.push({ role: 'assistant', content: botReply });
+                } else {
+                    addMessage("API Error: " + (data.error?.message || "Something went wrong."), 'bot');
+                }
+            } catch (error) {
+                document.getElementById(loadingId).remove();
+                addMessage("Network Error: " + error.message, 'bot');
+            }
+        }
+
+        function addMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            const uniqueId = 'msg-' + Date.now();
+            msgDiv
